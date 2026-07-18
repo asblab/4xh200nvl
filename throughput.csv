@@ -1,0 +1,15 @@
+model,precision,engine,config,gpus,single_stream_tok_s,ttft_c1_ms,c8_tok_s,ttft_c8_ms,date
+Qwen3-Coder-30B-A3B-Instruct,bf16,vllm-0.23.0,1xGPU,1,212.4,31,870.0,278,2026-07-17
+Qwen3-Coder-30B-A3B-Instruct,bf16,vllm-0.23.0,2xGPU,2,224.6,35,1001.3,426,2026-07-17
+Qwen3-Coder-30B-A3B-Instruct,bf16,vllm-0.23.0,4xGPU,4,238.7,37,987.9,489,2026-07-17
+Qwen3-Coder-30B-A3B-Instruct,FP8,vllm-0.23.0,1xGPU,1,196.0,34,984.0,250,2026-07-18
+gemma-4-26B-A4B-it,bf16,vllm-0.23.0,1xGPU,1,194.7,158,998.7,90,2026-07-17
+gemma-4-26B-A4B-it,bf16,vllm-0.23.0,2xGPU,2,204.3,160,1224.5,111,2026-07-17
+gemma-4-26B-A4B-it,bf16,vllm-0.23.0,4xGPU,4,221.0,164,1477.3,87,2026-07-17
+gemma-4-31B-it,bf16,vllm-0.23.0,1xGPU,1,50.9,73,345.8,374,2026-07-18
+DeepSeek-V4-Flash,bf16 fp8-cache,vllm-0.23.0,2xGPU,2,46.7,3267,167.5,5159,2026-07-18
+DeepSeek-V4-Flash,bf16 fp8-cache,vllm-0.23.0,4xGPU,4,50.4,2863,234.4,5247,2026-07-18
+DeepSeek-V4-Flash,bf16 fp8-cache,vllm-0.23.0,2xGPU+MTP,2,51.1,3323,202.3,3847,2026-07-18
+Qwen3-Coder-480B-A35B-Instruct,FP8,vllm-0.23.0,4xGPU,4,105.5,63,479.9,360,2026-07-17
+GLM-5.2,W4A16 int4,vllm-0.23.0,4xGPU,4,66.6,38,329.4,489,2026-07-19
+Qwen3-Coder-30B-A3B-Instruct,Q8_0,llama.cpp-b10064,CPU-only 128t,0,26.8,1868,94.3,4912,2026-07-17

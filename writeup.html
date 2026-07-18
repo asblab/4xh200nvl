@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Process &amp; technical detail</title>
+<style>
+/* ============================================================
+   Bench Report — shared system for both pages
+   Engineering-documentation style: one column, one accent,
+   sans prose / mono data. Light only by client requirement
+   (no dark variant — do not add prefers-color-scheme: dark).
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+
+  /* surface */
+  --paper: #f7f8f9;        /* neutral gray-white, not cream */
+  --panel: #eef0f2;
+  --line: #d8dce1;
+
+  /* ink */
+  --ink: #1a1e24;
+  --muted: #5b6570;
+
+  /* accent = importance only (section markers, links, .hl, focus) */
+  --accent: #1d5fb4;
+  --accent-ink: #14477e;
+  --accent-wash: rgba(42, 120, 214, 0.10);
+  --accent-ring: rgba(42, 120, 214, 0.28);
+
+  /* fixed series/data colors (charts, chips) */
+  --s1: #2a78d6;
+  --s1-ink: #1c579c;       /* legible text pairing for s1 */
+  --s2: #1baf7a;
+  --s2-ink: #0e7d57;       /* legible text pairing for s2 */
+
+  /* type */
+  --sans: system-ui, "Segoe UI", "Noto Sans", Cantarell,
+          "Liberation Sans", "DejaVu Sans", "Helvetica Neue",
+          Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono",
+          "Noto Sans Mono", "Liberation Mono", "DejaVu Sans Mono",
+          Menlo, Consolas, monospace;
+
+  /* THE COLUMN — the only width in the system (704px) */
+  --col: 44rem;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* ---- The Law of the Column ------------------------------------
+   body is the single content column. Nothing inside it ever sets
+   its own max-width; every block element therefore spans exactly
+   var(--col). Wide tables scroll inside .tw within the column. */
+body {
+  box-sizing: content-box;           /* --col measures content, padding is gutter */
+  max-width: var(--col);
+  margin: 0 auto;
+  padding: clamp(1.8rem, 5vh, 3.5rem) 1.25rem 5rem;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 106.25%/1.66 var(--sans);
+  -webkit-text-size-adjust: 100%;
+  overflow-wrap: break-word;
+}
+
+/* cover rule — the report's masthead bar, top of the column */
+body::before {
+  content: "";
+  display: block;
+  height: 4px;
+  background: var(--ink);
+  margin-bottom: 2.1rem;
+}
+
+/* ---- masthead ------------------------------------------------ */
+header.part {
+  margin: 0 0 2.6rem;
+  padding-bottom: 1.7rem;
+  border-bottom: 2px solid var(--ink);
+}
+
+header.part h1 {
+  margin: 0;
+  font-size: clamp(1.65rem, 1.2rem + 2.2vw, 2.05rem);
+  line-height: 1.16;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+header.part p {
+  margin: 0.85rem 0 0;
+  font-size: 1.02rem;
+  color: var(--muted);
+}
+
+/* spec sheet: mono key–value block under the title */
+dl.spec {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 2.2rem;
+  margin: 1.5rem 0 0;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+dl.spec dt,
+dl.spec dd {
+  margin: 0;
+  padding: 0.42em 0;
+  border-top: 1px solid var(--line);
+}
+
+dl.spec dt:first-of-type,
+dl.spec dt:first-of-type + dd { border-top: 0; }
+
+dl.spec dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding-top: 0.62em;              /* optically align caps with dd text */
+}
+
+/* ---- sections ------------------------------------------------ */
+section { margin: 2.8rem 0; }
+
+section + section {
+  border-top: 1px solid var(--line);
+  padding-top: 2.6rem;
+}
+
+h2 {
+  margin: 0 0 1.1rem;
+  font-size: 1.38rem;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* section number — mono, accent: the section marker */
+h2 .no {
+  font-family: var(--mono);
+  font-size: 0.8em;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--accent);
+  margin-right: 0.55em;
+  font-variant-numeric: tabular-nums;
+}
+
+h3 {
+  margin: 2rem 0 0.7rem;
+  font-size: 1.08rem;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+/* ---- prose --------------------------------------------------- */
+p { margin: 0 0 1.15rem; }
+p:last-child { margin-bottom: 0; }
+
+strong { font-weight: 700; }
+
+small { font-size: 0.85em; color: var(--muted); }
+
+a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: rgba(29, 95, 180, 0.4);
+  text-underline-offset: 0.18em;
+  transition: text-decoration-color 120ms ease;
+}
+
+a:hover { text-decoration-color: currentColor; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection { background: rgba(42, 120, 214, 0.18); }
+
+ul, ol {
+  margin: 0 0 1.15rem;
+  padding-left: 1.5rem;
+}
+
+li { margin: 0.3rem 0; }
+li::marker { color: var(--muted); }
+ol li::marker {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 2.5rem 0;
+}
+
+code, kbd {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  font-variant-numeric: tabular-nums;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0.08em 0.32em;
+}
+
+pre {
+  margin: 1.4rem 0;
+  padding: 0.9rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* ---- callouts ------------------------------------------------ */
+.note, .method {
+  margin: 1.5rem 0;
+  padding: 0.95rem 1.15rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.note::before, .method::before {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.note::before { content: "Note"; }
+.method::before { content: "Method"; }
+
+/* ---- table of contents --------------------------------------- */
+nav.toc {
+  margin: 2.4rem 0;
+  padding: 1.05rem 0 1.15rem;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+nav.toc ol, nav.toc ul {
+  margin: 0;
+  padding-left: 1.6rem;
+}
+
+nav.toc li { margin: 0.32rem 0; }
+
+nav.toc a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+nav.toc a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+/* ---- figures ------------------------------------------------- */
+figure { margin: 2rem 0; }
+
+/* media fills the column exactly — same edges as body text */
+figure img, figure svg, figure canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+figcaption, caption {
+  margin-top: 0.65rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--muted);
+  text-align: left;
+}
+
+caption {
+  caption-side: bottom;
+  padding-top: 0.65rem;
+  margin-top: 0;
+}
+
+/* ---- tables --------------------------------------------------
+   Open style: horizontal rules only. First/last cells have zero
+   inline padding so table text sits flush on the column edges —
+   exactly aligned with paragraph text above and below. */
+.tw {
+  margin: 1.6rem 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tw > table { margin: 0; }
+
+table {
+  width: 100%;
+  margin: 1.6rem 0;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+th {
+  padding: 0.5rem 0.75rem 0.45rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 2px solid var(--ink);
+  white-space: nowrap;
+}
+
+td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+th:first-child, td:first-child { padding-left: 0; }
+th:last-child,  td:last-child  { padding-right: 0; }
+
+th.n, td.n { text-align: right; white-space: nowrap; }
+
+/* best-result cell — the accent's third and final job */
+td.hl {
+  background: var(--accent-wash);
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
+  outline: 1px solid var(--accent-ring);
+  outline-offset: -1px;
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+/* ---- disclosure ---------------------------------------------- */
+details {
+  margin: 1.5rem 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+summary {
+  padding: 0.65rem 1rem;
+  font-size: 0.93rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+summary:hover { color: var(--accent); }
+summary::marker { color: var(--accent); }
+
+details[open] { padding-bottom: 1rem; }
+details[open] > summary {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0.9rem;
+}
+
+details > :not(summary) {
+  margin-left: 1rem;
+  margin-right: 1rem;
+}
+
+/* ---- chips --------------------------------------------------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.18em 0.65em;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  vertical-align: 0.1em;
+  white-space: nowrap;
+}
+
+/* series-keyed chips: swatch dot in the exact data color,
+   text darkened for contrast on paper */
+.chip.s1, .chip.blue  { color: var(--s1-ink); border-color: rgba(42, 120, 214, 0.4); }
+.chip.s2, .chip.green { color: var(--s2-ink); border-color: rgba(27, 175, 122, 0.4); }
+
+.chip.s1::before, .chip.blue::before,
+.chip.s2::before, .chip.green::before {
+  content: "";
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  flex: none;
+}
+
+.chip.s1::before, .chip.blue::before  { background: var(--s1); }
+.chip.s2::before, .chip.green::before { background: var(--s2); }
+
+/* ---- motion -------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---- mobile -------------------------------------------------- */
+@media (max-width: 640px) {
+  body { padding: 1.4rem 1rem 3.5rem; }
+  body::before { margin-bottom: 1.6rem; }
+
+  section { margin: 2.2rem 0; }
+  section + section { padding-top: 2rem; }
+
+  dl.spec { grid-template-columns: 1fr; }
+  dl.spec dt { padding: 0.6em 0 0.05em; }
+  dl.spec dd { border-top: 0; padding: 0 0 0.5em; }
+  dl.spec dt:first-of-type { border-top: 0; }
+
+  table { font-size: 0.78rem; }
+  th { padding: 0.4rem 0.5rem 0.35rem; }
+  td { padding: 0.45rem 0.6rem; }
+
+  details > :not(summary) {
+    margin-left: 0.75rem;
+    margin-right: 0.75rem;
+  }
+}
+
+/* ---- print --------------------------------------------------- */
+@media print {
+  body { background: #fff; padding-top: 0.5rem; }
+  a { color: inherit; }
+  .tw { overflow: visible; }
+  tr, figure, .note, .method { break-inside: avoid; }
+  details:not([open]) summary::marker { content: ""; }
+}
+</style>
+</head>
+<body>
+<header class="part">
+<h1>Process &amp; technical detail</h1>
+<p>Methods, complete tables, derivations, and failure analyses behind the <a href="index.html">results summary</a>.</p>
+
+<p><small><a href="index.html">← Testing &amp; capability</a></small></p>
+</header>
+<main>
+<section class="section">
+  <h2>Scope</h2>
+  <p>This page documents the measurement process behind the results: the hardware and software configuration, the exact benchmark invocations, the complete result tables, and the supporting analyses. All measurements were taken 2026-07-17 through 2026-07-21 on a single 4x H200 NVL node. Measurement closed 2026-07-21 on a frozen stack: vLLM v0.23.0, GPU driver 595.71.05, CUDA 13.2, and a single pinned version of the agent harness. The numbers are free to use.</p>
+</section>
+
+<section class="section">
+  <h2>Test environment</h2>
+  <figure>
+    <table>
+      <thead><tr><th>Component</th><th>Configuration</th></tr></thead>
+      <tbody>
+        <tr><td>GPUs</td><td>4x NVIDIA H200 NVL, 143,771 MiB HBM each (~564 GB total)</td></tr>
+        <tr><td>GPU interconnect</td><td>NVLink, all-to-all: 6 links per GPU pair at 26.5625 GB/s (~159 GB/s per direction per pair)</td></tr>
+        <tr><td>GPU driver / CUDA</td><td>590.48.01 / 13.1 through 2026-07-19; 595.71.05 / 13.2 from 2026-07-20 (capacity-matrix measurements)</td></tr>
+        <tr><td>CPU</td><td>2x AMD EPYC 9555, 128 cores / 256 threads total</td></tr>
+        <tr><td>System memory</td><td>1.1 TiB DDR5</td></tr>
+        <tr><td>Model store</td><td>Local NVMe + NFS model store, 25-gigabit link</td></tr>
+        <tr><td>Topology</td><td>All four GPUs on NUMA node 0; serving endpoints on localhost; 25-gigabit network</td></tr>
+        <tr><td>OS / kernel</td><td>Ubuntu 24.04.4 LTS, kernel 6.8.0-134-generic</td></tr>
+        <tr><td>GPU serving</td><td>vLLM v0.23.0, bf16 unless noted</td></tr>
+        <tr><td>CPU serving</td><td>llama.cpp build b10064</td></tr>
+      </tbody>
+    </table>
+    <figcaption>Node configuration. Every entry was verified from command output on the node, not taken from documentation.</figcaption>
+  </figure>
+</section>
+
+<section class="section">
+  <h2>Throughput methodology</h2>
+  <p>All GPU throughput rows were produced by vLLM's bench client running against a live server on the same node:</p>
+  <pre><code>vllm bench serve --backend openai-chat --dataset-name random \
+  --random-input-len 512 --random-output-len 256 \
+  --ignore-eos --seed 42</code></pre>
+  <p>Two load points per configuration: <strong>single-stream</strong> is concurrency 1 over 3 prompts; <strong>c8</strong> is concurrency 8 over 24 prompts. All servers were launched with <code>--gpu-memory-utilization 0.90 --max-model-len 32768</code>. TTFT is time to first token.</p>
+  <p>Multi-GPU rows use <strong>tensor parallelism</strong>: each layer's weight matrices are sharded across the GPUs, every GPU computes its shard for every token, and the partial results are combined with an all-reduce after each layer. All 4-GPU launches additionally required <code>--disable-custom-all-reduce</code> on this platform (see the initialization-stall section below).</p>
+  <details>
+    <summary>Model-specific serving notes</summary>
+    <p>DeepSeek-V4-Flash: 159 GB of bf16 weights; <code>--kv-cache-dtype fp8</code> is required by its attention implementation in this vLLM build, so its rows are bf16 weights with an fp8 KV cache. The speculative-decoding row enables the model's own draft head (one speculative token): +9% single-stream, +21% at c8, tool calls unaffected. Qwen3-Coder-480B-A35B-Instruct: 482 GB of FP8 weights, 4 GPUs. GLM-5.2: 387 GB, int4 weights with bf16 activations (compressed-tensors pack-quantized), 4 GPUs; the reasoning output requires a think-tag reasoning parser or the reasoning text leaks into message content. gemma-4-31B is dense (not a mixture-of-experts), which is why its throughput sits far below the similarly sized MoE models. The CPU row is llama.cpp with a Q8_0 quantization, 128 threads, <code>--numa distribute</code>, zen4 backend.</p>
+  </details>
+</section>
+
+<section class="section">
+  <h2>Serving throughput</h2>
+  <figure>
+    <table>
+      <thead>
+        <tr><th>Model</th><th>Precision</th><th>GPUs</th><th>Single-stream tok/s</th><th>TTFT (c1)</th><th>c8 aggregate tok/s</th><th>TTFT (c8)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Qwen3-Coder-30B-A3B-Instruct</td><td>bf16</td><td class="n">1</td><td class="n">212.4</td><td class="n">31 ms</td><td class="n">870.0</td><td class="n">278 ms</td></tr>
+        <tr><td>Qwen3-Coder-30B-A3B-Instruct</td><td>bf16</td><td class="n">2</td><td class="n">224.6</td><td class="n">35 ms</td><td class="n">1001.3</td><td class="n">426 ms</td></tr>
+        <tr><td>Qwen3-Coder-30B-A3B-Instruct</td><td>bf16</td><td class="n">4</td><td class="n hl">238.7</td><td class="n">37 ms</td><td class="n">987.9</td><td class="n">489 ms</td></tr>
+        <tr><td>Qwen3-Coder-30B-A3B-Instruct</td><td>FP8</td><td class="n">1</td><td class="n">196.0</td><td class="n">34 ms</td><td class="n">984.0</td><td class="n">250 ms</td></tr>
+        <tr><td>gemma-4-26B-A4B-it</td><td>bf16</td><td class="n">1</td><td class="n">194.7</td><td class="n">158 ms</td><td class="n">998.7</td><td class="n">90 ms</td></tr>
+        <tr><td>gemma-4-26B-A4B-it</td><td>bf16</td><td class="n">2</td><td class="n">204.3</td><td class="n">160 ms</td><td class="n">1224.5</td><td class="n">111 ms</td></tr>
+        <tr><td>gemma-4-26B-A4B-it</td><td>bf16</td><td class="n">4</td><td class="n">221.0</td><td class="n">164 ms</td><td class="n hl">1477.3</td><td class="n">87 ms</td></tr>
+        <tr><td>gemma-4-31B-it</td><td>bf16</td><td class="n">1</td><td class="n">50.9</td><td class="n">73 ms</td><td class="n">345.8</td><td class="n">374 ms</td></tr>
+        <tr><td>DeepSeek-V4-Flash</td><td>bf16 + fp8 KV</td><td class="n">2</td><td class="n">46.7</td><td class="n">3267 ms</td><td class="n">167.5</td><td class="n">5159 ms</td></tr>
+        <tr><td>DeepSeek-V4-Flash</td><td>bf16 + fp8 KV</td><td class="n">4</td><td class="n">50.4</td><td class="n">2863 ms</td><td class="n">234.4</td><td class="n">5247 ms</td></tr>
+        <tr><td>DeepSeek-V4-Flash (speculative decoding)</td><td>bf16 + fp8 KV</td><td class="n">2</td><td class="n">51.1</td><td class="n">3323 ms</td><td class="n">202.3</td><td class="n">3847 ms</td></tr>
+        <tr><td>Qwen3-Coder-480B-A35B-Instruct</td><td>FP8</td><td class="n">4</td><td class="n">105.5</td><td class="n">63 ms</td><td class="n">479.9</td><td class="n">360 ms</td></tr>
+        <tr><td>GLM-5.2</td><td>W4A16 (int4)</td><td class="n">4</td><td class="n">66.6</td><td class="n">38 ms</td><td class="n">329.4</td><td class="n">489 ms</td></tr>
+        <tr><td>Qwen3-Coder-30B (CPU, llama.cpp)</td><td>Q8_0</td><td class="n">0</td><td class="n">26.8</td><td class="n">1868 ms</td><td class="n">94.3</td><td class="n">4912 ms</td></tr>
+      </tbody>
+    </table>
+    <figcaption>Serving throughput, all fourteen measured configurations. Random 512-token prompts, 256-token outputs, <code>--ignore-eos</code>, seed 42. Single-stream = concurrency 1 (3 prompts); c8 = concurrency 8 (24 prompts). Highlighted cells are the highest single-stream and highest c8 values in the table. The CPU row is llama.cpp b10064, Q8_0, 128 threads, <code>--numa distribute</code>, zen4 backend.</figcaption>
+  </figure>
+</section>
+
+<section class="section">
+  <h2>Context-fill sweep</h2>
+  <p>Single-stream decode with the prompt fill swept and output fixed at 256 tokens, on one GPU per model.</p>
+  <figure>
+    <table>
+      <thead>
+        <tr><th>Prompt fill</th><th>Qwen3-30B tok/s</th><th>Qwen3-30B TTFT</th><th>gemma-4 tok/s</th><th>gemma-4 TTFT</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1k</td><td class="n">211.2</td><td class="n">32 ms</td><td class="n">197.6</td><td class="n">44 ms</td></tr>
+        <tr><td>8k</td><td class="n">182.0</td><td class="n">171 ms</td><td class="n">140.4</td><td class="n">282 ms</td></tr>
+        <tr><td>16k</td><td class="n">160.1</td><td class="n">307 ms</td><td class="n">116.5</td><td class="n">498 ms</td></tr>
+        <tr><td>28k</td><td class="n">129.7</td><td class="n">609 ms</td><td class="n">86.8</td><td class="n">962 ms</td></tr>
+      </tbody>
+    </table>
+    <figcaption>Decode speed versus context fill, single stream, output 256 tokens. From 1k to 28k of fill, decode falls 39% for Qwen3-30B and 56% for gemma-4.</figcaption>
+  </figure>
+  <p>DeepSeek-V4-Flash was swept separately to much larger fills on its 262k-context, speculative-decoding configuration (2 GPUs):</p>
+  <figure>
+    <table>
+      <thead><tr><th>Prompt fill</th><th class="n">Decode tok/s</th><th class="n">TTFT</th></tr></thead>
+      <tbody>
+        <tr><td class="n">16k</td><td class="n">81.9</td><td class="n">1.24 s</td></tr>
+        <tr><td class="n">64k</td><td class="n">49.6</td><td class="n">3.66 s</td></tr>
+        <tr><td class="n">128k</td><td class="n">35.4</td><td class="n">5.60 s</td></tr>
+        <tr><td class="n">240k</td><td class="n">20.2</td><td class="n">11.14 s</td></tr>
+      </tbody>
+    </table>
+    <figcaption>DeepSeek-V4-Flash decode speed and time to first token versus prompt fill; single stream, 256-token outputs, n=2 per point (n=1 at 128k and above). Retrieval checks on the same configuration: 5/5 at 32k and 128k of fill, 4/5 at 250k.</figcaption>
+  </figure>
+</section>
+
+<section class="section">
+  <h2>Concurrency ladder</h2>
+  <figure>
+    <table>
+      <thead>
+        <tr><th>Concurrency</th><th>Qwen3-30B agg tok/s</th><th>Qwen3-30B per-stream</th><th>Qwen3-30B P99 TTFT</th><th>gemma-4 agg tok/s</th><th>gemma-4 per-stream</th><th>gemma-4 P99 TTFT</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="n">8</td><td class="n">943</td><td class="n">117.9</td><td class="n">116 ms</td><td class="n">977</td><td class="n">122.2</td><td class="n">123 ms</td></tr>
+        <tr><td class="n">16</td><td class="n">1560</td><td class="n">97.5</td><td class="n">159 ms</td><td class="n">1585</td><td class="n">99.1</td><td class="n">184 ms</td></tr>
+        <tr><td class="n">32</td><td class="n">2539</td><td class="n">79.4</td><td class="n">283 ms</td><td class="n">2534</td><td class="n">79.2</td><td class="n">315 ms</td></tr>
+        <tr><td class="n">64</td><td class="n">3999</td><td class="n">62.5</td><td class="n">315 ms</td><td class="n">3801</td><td class="n">59.4</td><td class="n">557 ms</td></tr>
+        <tr><td class="n">128</td><td class="n">6063</td><td class="n">47.4</td><td class="n">773 ms</td><td class="n">5450</td><td class="n">42.6</td><td class="n">718 ms</td></tr>
+        <tr><td class="n">256</td><td class="n">8439</td><td class="n">33.0</td><td class="n">928 ms</td><td class="n">7409</td><td class="n">28.9</td><td class="n">1191 ms</td></tr>
+      </tbody>
+    </table>
+    <figcaption>Concurrency ladder, one GPU per model, warm server, 512-token prompts. Per-stream = aggregate / concurrency.</figcaption>
+  </figure>
+  <h3>Concurrent-stream capacity</h3>
+  <p>Capacity per configuration is the largest concurrency at which per-stream output stays at or above 20 tok/s. Two request shapes were measured: 512-token prompts with 256-token outputs (light load) and 8,192-token prompts with 512-token outputs (the shape of real coding-agent requests). Multi-GPU rows run separate single-model instances simultaneously, one bench client per instance, and sum the per-instance knees; tensor parallelism is not used for capacity scaling. Measurement rules that mattered: <strong>every invocation uses a fresh random seed</strong> (see the prefix-cache note below); only the row&rsquo;s instances run during a measurement (an idle engine on another GPU reduced active-instance throughput by about 10%); knee points near the threshold were confirmed 2-of-3.</p>
+  <figure>
+    <table>
+      <thead><tr><th>Model</th><th class="n">8k &middot; 1 GPU</th><th class="n">8k &middot; 2 GPUs</th><th class="n">8k &middot; 4 GPUs</th><th class="n">512 &middot; 4 GPUs</th></tr></thead>
+      <tbody>
+        <tr><td>Qwen3-Coder-30B-A3B</td><td class="n">64</td><td class="n">128</td><td class="n hl">256</td><td class="n">1,792</td></tr>
+        <tr><td>gemma-4-26B-A4B</td><td class="n">48</td><td class="n">96</td><td class="n">192</td><td class="n">1,280</td></tr>
+        <tr><td>gemma-4-31B</td><td class="n">8</td><td class="n">16</td><td class="n">32</td><td class="n">224</td></tr>
+        <tr><td>DeepSeek-V4-Flash (2 GPUs per instance)</td><td class="n">&mdash;</td><td class="n">24</td><td class="n">48</td><td class="n">192</td></tr>
+        <tr><td>Qwen3-Coder-480B-A35B</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">16</td><td class="n">112</td></tr>
+        <tr><td>GLM-5.2</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">8</td><td class="n">32</td></tr>
+      </tbody>
+    </table>
+    <figcaption>Concurrent streams at a 20 tok/s per-stream floor, fresh prompts every run. All cells for both prompt sizes, including per-GPU-count 512-token values, are in <code>users.csv</code>. Peak observed aggregate: 37,700 output tok/s with fresh prompts (51,400 cache-hot); four Qwen3-30B instances, 512-token prompts.</figcaption>
+  </figure>
+  <p><strong>Prefix-cache inflation.</strong> vLLM enables automatic prefix caching by default, and the bench client generates its prompt set from a seed. Re-running a bench with the same seed therefore lets the server skip prefill for prompts it has seen, and the effect scales with prefill cost: for DeepSeek-V4-Flash (3.3&nbsp;s prefill at 512 tokens) repeated-seed runs measured 2&ndash;3&times; higher throughput than fresh-prompt runs at the same concurrency, and its capacity figures were initially overstated 2&times; (192 versus a true 96 at 512-token prompts). The discrepancy was caught when two identical instances on different GPU pairs disagreed 3&times; and both hardware and interconnect checks came back clean; a fresh-seed run on the &ldquo;fast&rdquo; instance reproduced the &ldquo;slow&rdquo; one exactly. Every capacity number in the tables above was measured with unique prompts. Real agent traffic re-sends its own growing conversation prefix and does benefit from the cache, so production capacity sits between these cold floors and the cached ceilings.</p>
+</section>
+
+<section class="section">
+  <h2>Multi-GPU decode analysis</h2>
+  <p>Qwen3-Coder-30B-A3B activates ~3.3B parameters per token. In bf16 (2 bytes per parameter), reading the active weights once per token moves ~6.6 GB per token (est.). At the measured single-GPU, single-stream rate of 212.4 tok/s, that is ~1.4 TB/s of effective weight-read bandwidth (est.), about 29% (est.) of the H200's ~4.8 TB/s specified HBM bandwidth. The estimate counts active-weight reads only; KV-cache and activation traffic are excluded, so it is a lower bound on total memory traffic.</p>
+  <p>If single-stream decode were bandwidth-bound, sharding the weights across N GPUs would cut per-GPU weight traffic by N and permit up to an N-fold speedup. Measured single-stream scaling (computed from the throughput table): Qwen3-30B +5.7% at 2 GPUs and +12.4% at 4 GPUs over 1 GPU; gemma-4 +4.9% and +13.5%. Tensor parallelism inserts an all-reduce after each layer on every token; the measured deltas are consistent with per-token latency terms, not HBM bandwidth, limiting single-stream decode at this model size.</p>
+  <p>At concurrency 8 the picture differs by model: Qwen3-30B rises from 870.0 (1 GPU) to 1001.3 (2 GPUs, +15.1%) and then drops slightly to 987.9 at 4 GPUs (below the 2-GPU value); gemma-4 continues scaling, 998.7 to 1224.5 (+22.6%) to 1477.3 (+47.9% over 1 GPU).</p>
+</section>
+
+<section class="section">
+  <h2>4-GPU initialization stall</h2>
+  <p><strong>Symptom.</strong> 4-GPU tensor-parallel launches stalled during vLLM engine initialization and never reached a serving state. The same model and flags on 1 and 2 GPUs initialized normally.</p>
+  <p><strong>Isolation.</strong> The stall was narrowed to vLLM's custom all-reduce path during startup: disabling only that component, with everything else unchanged, allowed initialization to complete.</p>
+  <p><strong>Resolution.</strong> All 4-GPU launches on this platform run with <code>--disable-custom-all-reduce</code>, which falls back to NCCL for cross-GPU reductions. Every 4-GPU row in the tables above was collected under this flag.</p>
+  <p><strong>GPU-wedge observation.</strong> Killing a stalled launch did not always return the GPUs to a clean state; a wedged GPU blocked subsequent launches on that device until the stale state cleared. Stalled 4-GPU launches were therefore treated as a state to avoid rather than retry.</p>
+  <p><strong>Second occurrence.</strong> After an unrelated node reboot, the same stall class appeared at just 2 ranks: a 2-GPU launch hung in NCCL initialization for 20+ minutes, and after a graceful stop the driver reported unreadable utilization on the two affected GPUs, with a diagnostic container frozen in kernel state and unkillable from userland. A further reboot (with a driver update to 595.71.05) cleared it, and a 4-rank allreduce smoke test passed in seconds afterward. The operating rule that came out of both incidents: after any reboot, prove multi-rank NCCL with the 2-minute smoke test before the first multi-GPU model launch, and never hard-kill a process that may be inside a collective.</p>
+</section>
+
+<section class="section">
+  <h2>Tool calling and the streaming-parser failure</h2>
+  <p>Each model was probed at temperature 0 through vLLM's tool-call parsers before any agentic run.</p>
+  <figure>
+    <table>
+      <thead><tr><th>Model</th><th>Parser</th><th>Observed behavior</th></tr></thead>
+      <tbody>
+        <tr><td>Qwen2.5-Coder-32B</td><td>hermes (+ template)</td><td>No structured calls; call-shaped text emitted in 3 different formats</td></tr>
+        <tr><td>Qwen3-Coder-30B</td><td>qwen3_coder</td><td>Structured calls, but the streaming path drops calls that lack the opening tool_call tag</td></tr>
+        <tr><td>Qwen3-Coder-30B</td><td>qwen3_xml</td><td>Structured calls; 0/30 turn-1 failures in a full rerun</td></tr>
+        <tr><td>gemma-4-26B-A4B-it</td><td>gemma4</td><td>Structured calls; leaks <code><|channel>thought</code> markers into final text</td></tr>
+        <tr><td>DeepSeek-V4-Flash</td><td>deepseek_v4</td><td>Structured on first try; 0 protocol failures over 30 tasks</td></tr>
+        <tr><td>Qwen3-Coder-480B</td><td>qwen3_xml</td><td>Structured on first try; 0 protocol failures over 30 tasks</td></tr>
+        <tr><td>GLM-5.2</td><td>glm47 + think-tag reasoning parser</td><td>Structured on first try; without a reasoning parser, reasoning text leaked into message content with a dangling close tag</td></tr>
+      </tbody>
+    </table>
+    <figcaption>Tool-call parser probes, temperature 0, vLLM v0.23.0 parsers. "Structured" means the server returned a parsed tool-call object rather than call-shaped plain text.</figcaption>
+  </figure>
+  <p>The Qwen3-Coder-30B case is a streaming-specific parser failure. With the qwen3_coder parser, 9 of 30 agentic tasks ended at turn 1: the model's first response contained a call the streaming parse path dropped because the opening tool_call tag was missing from the emitted text. The 10 failing transcripts, re-fed through the non-streaming path of both qwen3 parsers, parsed 10 for 10 — the model's output was recoverable; the incremental streaming parser was the failure point.</p>
+  <p>Switching the same model to the qwen3_xml parser and rerunning the full suite produced 0/30 turn-1 failures. The pass rate did not change (4/30 under both parsers), and median turns per session rose from 6.5 to 9: sessions that previously ended at the first dropped call instead ran to completion.</p>
+  <p><strong>Reliability probes.</strong> Each of the six models also ran a 50-prompt tool-call probe at temperature 0: 38 well-formed prompts across three tool schemas, plus 12 prompts that deliberately mismatch tool and target (a directory passed to a file reader, and similar). All six models produced correctly structured calls on all 38 well-formed prompts &mdash; 228 of 228 with zero malformed calls. On the mismatched prompts the models differ in behavior, not correctness: Qwen3-Coder-480B refused 9 of 12 with an explanation, GLM-5.2 and Qwen3-30B refused 2, DeepSeek-V4-Flash 1, and both gemmas called the tool as asked every time.</p>
+</section>
+
+<section class="section">
+  <h2>CPU serving</h2>
+  <p>The CPU baseline serves the same Qwen3-Coder-30B model through llama.cpp b10064: Q8_0 quantization, 128 threads across both EPYC 9555 sockets, <code>--numa distribute</code>, zen4 backend. llama-bench measures pp512 at 196.9 tok/s and tg128 at 39.6 tok/s. Under the same serving bench as the GPU rows, single-stream decode is 26.8 tok/s (TTFT 1868 ms) and c8 aggregate is 94.3 tok/s (TTFT 4912 ms).</p>
+  <p>Bandwidth arithmetic: at Q8_0, roughly 1 byte per parameter (est.), the ~3.3B active parameters imply ~3.3 GB of weight reads per token (est.). The llama-bench decode rate of 39.6 tok/s corresponds to ~130 GB/s of sustained weight reads (est.); the served single-stream rate of 26.8 tok/s corresponds to ~88 GB/s (est.). Against the single-GPU bf16 rows, the measured deltas are 212.4 vs 26.8 tok/s single-stream (~7.9x) and 870.0 vs 94.3 tok/s at c8 (~9.2x).</p>
+</section>
+
+<section class="section">
+  <h2>Agentic evaluation methodology</h2>
+  <p>The suite is 30 coding tasks derived from Exercism exercises: 14 Python, 8 JavaScript, 8 Go. A terminal coding agent runs each task at stock defaults with no extensions; the product name is withheld under this project's publication policy. Hidden tests execute after the agent finishes and alone decide pass or fail. Zero retries, server-default sampling, and a 600-second cap per task.</p>
+  <p><strong>Null lane.</strong> To confirm the pass bit is sound, the hidden tests were run against the untouched task stubs: 35/35 fail. A passing task therefore requires the agent to have produced a working change.</p>
+  <p><strong>Suite versions.</strong> Suite v1 rows are from 2026-07-17. Suite v2 contains identical tasks and adds node-to-bun PATH shims; later rows use v2.</p>
+  <p><strong>Publication policy.</strong> Every completed run is published as a table row; there is no score threshold. Early rows in <code>evals.csv</code> include a second harness that was used briefly and then dropped; those rows are retained as data.</p>
+</section>
+
+<section class="section">
+  <h2>Evaluation results and session shape</h2>
+  <figure>
+    <table>
+      <thead><tr><th>Model</th><th>Serving configuration</th><th class="n">Passed</th><th class="n">Errored tool calls</th><th class="n">Median wall clock</th><th class="n">Median output tokens</th></tr></thead>
+      <tbody>
+        <tr><td>DeepSeek-V4-Flash</td><td>bf16 + fp8 KV, 2 GPUs</td><td class="n hl">16/30</td><td class="n">56 of 437</td><td class="n">54 s</td><td class="n">4832</td></tr>
+        <tr><td>GLM-5.2</td><td>W4A16, 4 GPUs</td><td class="n">11/30</td><td class="n">4 of 178</td><td class="n">122 s</td><td class="n">8249</td></tr>
+        <tr><td>Qwen3-Coder-480B-A35B</td><td>FP8, 4 GPUs</td><td class="n">9/30</td><td class="n">22 of 192</td><td class="n">26 s</td><td class="n">2717</td></tr>
+        <tr><td>gemma-4-31B-it</td><td>bf16, 1 GPU</td><td class="n">8/30</td><td class="n">30 of 229</td><td class="n">39 s</td><td class="n">1886</td></tr>
+        <tr><td>gemma-4-26B-A4B-it</td><td>bf16, 1 GPU</td><td class="n">7/30</td><td class="n">208 of 604</td><td class="n">33 s</td><td class="n">5682</td></tr>
+        <tr><td>Qwen3-Coder-30B-A3B</td><td>bf16, 1 GPU</td><td class="n">5/30</td><td class="n">53 of 340</td><td class="n">27 s</td><td class="n">5157</td></tr>
+        <tr><td>Qwen2.5-Coder-32B</td><td>&mdash;</td><td colspan="3">Not runnable as an agent (no structured tool calls in this stack)</td><td></td></tr>
+      </tbody>
+    </table>
+    <figcaption>The final sweep: all six models re-run consecutively 2026-07-20/21 on the frozen stack (vLLM v0.23.0, driver 595.71.05, CUDA 13.2, agent harness pinned at one version), zero protocol failures. Earlier runs matched within &plusmn;2 points per model; DeepSeek-V4-Flash&rsquo;s four project runs span 15&ndash;18 of 30 (mean 16). All prior rows are in <code>evals.csv</code>.</figcaption>
+  </figure>
+  <p><strong>DeepSeek-V4-Flash session shape.</strong> 18/30: 9/14 Python, 6/8 Go, 3/8 JavaScript. Median 13.5 turns per session; 49 errored tool calls out of 417, each recovered from; zero protocol failures.</p>
+  <p><strong>GLM-5.2.</strong> The lowest tool-call error rate measured (3 errored calls in 163) and zero protocol failures. Sessions are slow &mdash; 127 s median wall clock, 8276 median output tokens &mdash; because the model emits reasoning tokens before acting.</p>
+  <p><strong>Qwen3-Coder-480B.</strong> 0 protocol failures. In each run, 2&ndash;3 tasks failed on test-suite timeouts &mdash; submitted solutions that loop indefinitely. Sessions were short; the model typically wrote a solution once and did not iterate against test feedback.</p>
+  <p><strong>gemma-4-31B.</strong> The most token-efficient sessions measured: 1829 median output tokens, about a fifth of the 26B&rsquo;s 6831, at a higher pass rate (8/30 versus 5/30).</p>
+  <p><strong>gemma-4-26B.</strong> Long sessions that continued through 450 errored tool calls out of 1041, recovering each time.</p>
+</section>
+
+<section class="section">
+  <h2>Thermals and power</h2>
+  <p>GPU temperature, power, and clock samples were logged every 10 seconds through the heaviest measurement windows: 4,840 samples over 4.2 hours, including the peak-load capacity tests. Maximum observed temperature was 70&deg;C (three samples; p99 62&ndash;64&deg;C per GPU) and maximum board power 590 W against the 600 W limit. No thermal throttling was observed; the only clock reduction was standard power-limit governance to 1425 MHz on 8 busy samples. At the peak measured load (51,400 aggregate output tok/s across four instances, cache-hot prefills) the node produced 21.9 output tokens per second per GPU-watt, using the peak all-GPU power draw of 2,346 W; the fresh-prompt peak of 37,700 tok/s was measured after power logging stopped, so no per-watt figure is quoted for it.</p>
+</section>
+
+<section class="section">
+  <h2>Operational incidents</h2>
+  <p>Failure modes encountered while running the lab, and what fixed each. All were recoverable; none damaged data that had been committed.</p>
+  <p><strong>Local scratch exhaustion, five times.</strong> The node&rsquo;s local temporary space is 2&nbsp;GB, and three separate growth mechanisms filled it during evaluation runs: per-session agent databases (~10&nbsp;MB per task), task workspaces accumulating JavaScript dependency trees across runs, and a runtime that extracts a ~5.6&nbsp;MB native library per process and only removes it on graceful exit &mdash; every timeout-killed process leaked one. The durable fix was per-task cleanup of all three classes inside the runner; a sweep of leaked libraries recovered 90% of the volume at its worst.</p>
+  <p><strong>Shared-filer write protection, twice.</strong> The NFS model store sat near 98% full for most of the project, and its cluster twice switched the export to read-only under a capacity-protection state &mdash; refusing all writes including deletes, so the condition could not be relieved from the client side. One flip killed an evaluation run mid-write, and its traceback was unwritable because the log lived on the same filesystem. Both cleared without client action; the durable fix was the export being grown 12%, moving it well below the protection watermark. On shared storage, capacity headroom is availability.</p>
+  <p><strong>Escaped test processes.</strong> Submitted solutions that loop forever are killed by the harness&rsquo;s test timeout &mdash; but the timeout killed only the direct child, and the grandchild running the solution survived: three orphans were found consuming a full CPU core each for 30+ hours on a shared node. Fix: run tests in their own process group and kill the group.</p>
+  <p><strong>Measurement traps.</strong> Two are documented in their own sections: the streaming tool-call parser that silently dropped model output (tool calling, above), and prefix caching inflating repeated-prompt benchmarks by up to 3&times; (capacity, above). Both were caught by cross-checking two independent measurements that should have agreed and did not.</p>
+</section>
+
+<section class="section">
+  <h2>Data files</h2>
+  <p>Every run behind this page is committed as data: <code>throughput.csv</code> (all serving measurements), <code>users.csv</code> (the concurrent-stream matrix), and <code>evals.csv</code> (all evaluation runs, both suite versions). The numbers are free to use.</p>
+</section>
+</main>
+<footer>
+<hr>
+<p><small>Measured 2026-07-17/21 · numbers are free to use · <a href="throughput.csv">throughput.csv</a> · <a href="users.csv">users.csv</a> · <a href="evals.csv">evals.csv</a></small></p>
+</footer>
+</body>
+</html>
